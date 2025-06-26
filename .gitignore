@@ -1,0 +1,45 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*.sublime-project
+*.sublime-workspace
+
+# Mac/Linux system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+
+# Google service account credentials (if used locally)
+backend/credentials.json
+*.pem
+*.p12
+
+# Streamlit secrets (use Streamlit Cloud secrets manager instead)
+.streamlit/secrets.toml
+
+# Jupyter/IPython
+.ipynb_checkpoints/
+
+# Log or temporary files
+*.log
+*.tmp
+
+# Cache and build files
+*.egg-info/
+.eggs/
+dist/
+build/
+.cache/
