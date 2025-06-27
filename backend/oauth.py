@@ -27,7 +27,10 @@ def fetch_token(code: str):
         scopes=SCOPES,
         redirect_uri=st.secrets["general"]["REDIRECT_URI"]
     )
-    flow.fetch_token(code=code)
+    flow.fetch_token(
+        code=code,
+        client_secret=st.secrets["google_oauth"]["client_secret"]
+    )
     return flow.credentials
 
 
