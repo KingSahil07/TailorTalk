@@ -1,19 +1,14 @@
 # agent/langgraph_agent.py
-
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import datetime
 import streamlit as st
+from agent.langgraph_agent import get_langgraph_agent
 from PIL import Image
 import pytz
-
-# Add parent directory to path to allow importing agent and backend
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from agent.langgraph_agent import get_langgraph_agent
-
-# Chat styling
-st.markdown("""
+st.markdown(
+    """
     <style>
         .stChatMessage {
             background-color: black;
@@ -21,52 +16,55 @@ st.markdown("""
             border-radius: 8px;
         }
     </style>
-""", unsafe_allow_html=True)
-
-# Initialize session state for booking suggestion
+    """,
+    unsafe_allow_html=True
+)
 if "pending_booking" not in st.session_state:
     st.session_state.pending_booking = None
 
-# Set Streamlit app metadata
+# Set page config with logo icon
 st.set_page_config(
     page_title="TailorTalk",
     page_icon="🧵",
     layout="centered"
 )
-
-# Load and display logo and title
+# Load logo image
 logo_path = os.path.join("frontend", "assets", "logo.jpeg")
 if os.path.exists(logo_path):
-    col1, col2 = st.columns([1, 9])
+    col1, col2 = st.columns([1, 9])  # Logo : Title ratio
+
     with col1:
         st.image(logo_path, width=50)
+
     with col2:
         st.markdown("""
             <div style='display: flex; align-items: center; height: 100%;'>
                 <h1 style='margin-bottom: 0; font-size: 36px;'>TailorTalk</h1>
             </div>
         """, unsafe_allow_html=True)
-    st.caption("Tailor your schedule with just a few words.")
+    st.caption("Book your meetings using natural language!")
 else:
     st.warning("Logo image not found.")
 
-# Initialize message history
+
+# Session state for chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 agent = get_langgraph_agent()
 
-# Render previous messages
+# Display previous chat messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input: user message
+# User input
 if user_input := st.chat_input("What would you like to do?"):
+    # st.session_state.messages.append({"role": "user", "content": user_input})
+        # Show user's message in chat
     st.chat_message("user").markdown(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # Handle confirmation of suggested booking
+    # ✅ Check if user is responding to a booking suggestion
     if st.session_state.get("pending_booking"):
         user_response = user_input.lower()
 
@@ -76,10 +74,13 @@ if user_input := st.chat_input("What would you like to do?"):
 
             if is_time_slot_available(booking["start"], booking["end"]):
                 link = book_meeting(booking["summary"], booking["start"], booking["end"])
+                
+                # Format datetime nicely
                 start_dt = datetime.datetime.fromisoformat(booking["start"])
                 ist = pytz.timezone("Asia/Kolkata")
                 start_ist = start_dt.astimezone(ist)
                 readable = start_ist.strftime("%A, %d %B %Y at %I:%M %p")
+
                 response = f"✅ Booking confirmed for **{readable}**! [View on Calendar]({link})"
             else:
                 response = "❌ That time slot just got booked. Try another one?"
@@ -90,6 +91,7 @@ if user_input := st.chat_input("What would you like to do?"):
             st.rerun()
             st.stop()
 
+
         elif user_response in ["no", "nope", "nah"]:
             response = "👍 Okay, I won't book that."
             st.session_state.pending_booking = None
@@ -98,7 +100,9 @@ if user_input := st.chat_input("What would you like to do?"):
             st.rerun()
             st.stop()
 
-    # Invoke LangGraph agent for all other messages
+    # 🟨 If it's not yes/no, continue to LangGraph agent
+
+    # Agent processing
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             result = agent.invoke({
@@ -109,14 +113,14 @@ if user_input := st.chat_input("What would you like to do?"):
                 "booking_link": None,
                 "error": None
             })
-
-            # Handle availability check intent
+            
             if result["intent"] == "check_availability":
                 dt = result.get("datetime")
-                readable_date = (
-                    datetime.datetime.fromisoformat(dt["start"]).strftime("%A, %d %B %Y")
-                    if dt else "that day"
-                )
+                if dt:
+                    start_date = datetime.datetime.fromisoformat(dt["start"])
+                    readable_date = start_date.strftime("%A, %d %B %Y")  # e.g. Sunday, 30 June 2025
+                else:
+                    readable_date = "that day"
 
                 if result.get("availability"):
                     slots = result["availability"]
@@ -125,16 +129,17 @@ if user_input := st.chat_input("What would you like to do?"):
                         slot_lines = "\n".join([
                             f"{s.strftime('%I:%M %p')} - {e.strftime('%I:%M %p')}" for s, e in slots
                         ])
-                        response = f"✅ You're free on **{readable_date}** at:\n\n{slot_lines}"
 
-                        display_start = first_slot[0].strftime("%I:%M %p")
-                        display_end = first_slot[1].strftime("%I:%M %p")
+                        response = f"✅ You're free on **{readable_date}** at:\n\n{slot_lines}"
+                        display_start = first_slot[0].strftime("%I:%M %p")  # e.g. 09:00 AM
+                        display_end = first_slot[1].strftime("%I:%M %p")    # e.g. 10:00 AM
                         response += f"\n\n💡 Would you like me to book a meeting from {display_start} to {display_end}?"
 
-                        # Save slot suggestion
-                        slot_date = datetime.datetime.fromisoformat(dt["start"]).strftime("%Y-%m-%d")
+                        # 🧠 Save suggestion for confirmation flow
+                        slot_date = start_date.strftime("%Y-%m-%d")
                         start_time = first_slot[0].strftime("%H:%M:%S")
                         end_time = first_slot[1].strftime("%H:%M:%S")
+                        # Combine date + time as full datetime strings
                         start_dt_str = f"{slot_date}T{start_time}"
                         end_dt_str = f"{slot_date}T{end_time}"
 
@@ -148,7 +153,6 @@ if user_input := st.chat_input("What would you like to do?"):
                 else:
                     response = f"❌ I couldn't find availability for **{readable_date}**."
 
-            # Handle booking confirmation
             elif result["intent"] == "book_meeting":
                 if result["confirmed"]:
                     dt = result.get("datetime")
@@ -161,15 +165,25 @@ if user_input := st.chat_input("What would you like to do?"):
                         readable_date = "the scheduled time"
 
                     response = f"✅ Booking confirmed for **{readable_date}**! [View on Calendar]({result['booking_link']})"
+                
+                elif result.get("error") == "Time slot unavailable.":
+                    response = "⚠️ That time slot is already booked. Try a different time."
 
-            # Default fallback
+                elif result.get("error") == "No time detected.":
+                    response = "🤖 I couldn't find a date/time in your message. Could you rephrase?"
+
+                elif result.get("error") == "Calendar API failed.":
+                    response = "❌ Something went wrong while accessing the calendar. Please try again."
+
+                else:
+                    response = "❌ Something went wrong while booking."
+
             else:
                 response = "🤔 I'm not sure what you're asking. Try rephrasing your request."
 
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
-
-            # Redraw all messages
+            # Display previous chat messages
             for msg in st.session_state.messages:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
