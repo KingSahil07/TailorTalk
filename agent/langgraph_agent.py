@@ -69,8 +69,13 @@ def fetch_availability(state: AgentState) -> AgentState:
             free_slots.append((current.time(), booked_start.time()))
         current = max(current, datetime.datetime.fromisoformat(e))
 
+    # if current < booked_start:
+    #     free_slots.append((current.time(), booked_start.time()))
+    # current = max(current, datetime.datetime.fromisoformat(e))
+
     if current < working_end:
-        free_slots.append((current.time(), working_end.time()))
+        if current.time() < working_end.time():  # ✅ avoid inverted times
+            free_slots.append((current.time(), working_end.time()))
 
     print("🟢 Free slots:", free_slots)
 
