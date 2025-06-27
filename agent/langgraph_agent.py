@@ -5,8 +5,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableLambda
 from typing import TypedDict, Optional
-from backend.calendar_utils import is_time_slot_available, book_meeting, get_calendar_service
+from backend.calendar_utils import is_time_slot_available, book_meeting #get_calendar_service
 import datetime
+from streamlit import session_state as ss
+from googleapiclient.discovery import build
 
 # Define conversation state
 class AgentState(TypedDict):
@@ -32,7 +34,7 @@ def get_intent(state: AgentState) -> AgentState:
     print("Intent Detected:", intent)
     return {**state, "intent": intent}
 
-from backend.calendar_utils import get_calendar_service
+# from backend.calendar_utils import get_calendar_service
 def fetch_availability(state: AgentState) -> AgentState:
     dt = state.get("datetime")
     if not dt:
@@ -44,7 +46,9 @@ def fetch_availability(state: AgentState) -> AgentState:
     start_utc = start_date.astimezone(datetime.timezone.utc)
     end_utc = end_of_day.astimezone(datetime.timezone.utc)
 
-    service = get_calendar_service()
+    # service = get_calendar_service()
+    creds = ss["google_creds"]
+    service = build("calendar", "v3", credentials=creds)
     events_result = service.events().list(
         calendarId='primary',
         timeMin=start_utc.isoformat(),
@@ -218,8 +222,9 @@ def confirm(state: AgentState) -> AgentState:
     end_iso = dt["end"]
 
     try:
-        if is_time_slot_available(start_iso, end_iso):
-            link = book_meeting("TailorTalk Meeting", start_iso, end_iso)
+        creds = ss["google_creds"]
+        if is_time_slot_available(start_iso, end_iso, creds):
+            link = book_meeting("TailorTalk Meeting", start_iso, end_iso, creds)
             return {**state, "confirmed": True, "booking_link": link}
         else:
             return {**state, "confirmed": False, "booking_link": None, "error": "Time slot unavailable."}
@@ -273,19 +278,19 @@ if __name__ == "__main__":
     else:
         print("❌ Could not confirm booking.")
 
-def is_time_slot_available(start_time_iso, end_time_iso):
-    service = get_calendar_service()
-    events_result = service.events().list(
-        calendarId='primary',
-        timeMin=start_time_iso,
-        timeMax=end_time_iso,
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-    events = events_result.get('items', [])
-    if events:
-        print("❗ Conflicting Events:")
-        for event in events:
-            print("📅", event.get("summary"), "→", event["start"].get("dateTime"))
+# def is_time_slot_available(start_time_iso, end_time_iso):
+#     service = get_calendar_service()
+#     events_result = service.events().list(
+#         calendarId='primary',
+#         timeMin=start_time_iso,
+#         timeMax=end_time_iso,
+#         singleEvents=True,
+#         orderBy='startTime'
+#     ).execute()
+#     events = events_result.get('items', [])
+#     if events:
+#         print("❗ Conflicting Events:")
+#         for event in events:
+#             print("📅", event.get("summary"), "→", event["start"].get("dateTime"))
 
-    return len(events) == 0
+#     return len(events) == 0

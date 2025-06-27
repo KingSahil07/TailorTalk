@@ -19,6 +19,32 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+# ... Existing imports ...
+from backend.oauth import get_login_url, fetch_token
+from google.oauth2.credentials import Credentials
+
+# ✅ Handle Google OAuth code
+query_params = st.query_params
+auth_code = query_params.get("code")
+st.write("Auth code received:", auth_code)
+
+if auth_code and "google_creds" not in st.session_state:
+    creds = fetch_token(auth_code)
+    if creds:
+        st.session_state["google_creds"] = creds
+        st.query_params.clear()  # ✅ clears ?code=... from URL
+        st.rerun()
+
+# ✅ Login prompt if not authenticated
+if "google_creds" not in st.session_state:
+    st.title("🔐 Login to Google Calendar")
+    st.write("You need to sign in with your Google account to use TailorTalk.")
+    if st.button("Login with Google"):
+        auth_url = get_login_url()
+        st.markdown(f"[Click here to authorize 🚀]({auth_url})", unsafe_allow_html=True)
+    st.stop()
+
+
 if "pending_booking" not in st.session_state:
     st.session_state.pending_booking = None
 
@@ -71,10 +97,11 @@ if user_input := st.chat_input("What would you like to do?"):
         if user_response in ["yes", "ya", "sure", "ok", "okay"]:
             booking = st.session_state.pending_booking
             from backend.calendar_utils import is_time_slot_available, book_meeting
+            # Use Google OAuth credentials to check availability and book meeting
+            creds = st.session_state["google_creds"]
 
-            if is_time_slot_available(booking["start"], booking["end"]):
-                link = book_meeting(booking["summary"], booking["start"], booking["end"])
-                
+            if is_time_slot_available(booking["start"], booking["end"], creds):
+                link = book_meeting(booking["summary"], booking["start"], booking["end"], creds)
                 # Format datetime nicely
                 start_dt = datetime.datetime.fromisoformat(booking["start"])
                 ist = pytz.timezone("Asia/Kolkata")

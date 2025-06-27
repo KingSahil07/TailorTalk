@@ -35,33 +35,27 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 # def get_calendar_service():
 #     creds = get_credentials()
 #     return build('calendar', 'v3', credentials=creds)
+# backend/calendar_utils.py
 
-def is_time_slot_available(start: str, end: str) -> bool:
-    service = get_calendar_service()
+def is_time_slot_available(start: str, end: str, creds: Credentials) -> bool:
+    service = build("calendar", "v3", credentials=creds)
 
     start_dt = datetime.datetime.fromisoformat(start)
     end_dt = datetime.datetime.fromisoformat(end)
 
-    # ✅ Ensure timezone-aware in UTC
     if start_dt.tzinfo is None:
         start_dt = start_dt.replace(tzinfo=pytz.UTC)
     if end_dt.tzinfo is None:
         end_dt = end_dt.replace(tzinfo=pytz.UTC)
 
-    # ✅ Prevent API call if range is invalid
     if end_dt <= start_dt:
-        print("❌ Invalid time range: end time is before or equal to start time.")
+        print("❌ Invalid time range.")
         return False
-
-    start_time_iso = start_dt.isoformat()
-    end_time_iso = end_dt.isoformat()
-
-    print("Checking slot:", start_time_iso, "→", end_time_iso)
 
     events_result = service.events().list(
         calendarId='primary',
-        timeMin=start_time_iso,
-        timeMax=end_time_iso,
+        timeMin=start_dt.isoformat(),
+        timeMax=end_dt.isoformat(),
         singleEvents=True,
         orderBy='startTime'
     ).execute()
@@ -69,25 +63,21 @@ def is_time_slot_available(start: str, end: str) -> bool:
     events = events_result.get('items', [])
     return len(events) == 0
 
-def book_meeting(summary, start_time_iso, end_time_iso):
-    service = get_calendar_service()
+def book_meeting(summary: str, start: str, end: str, creds: Credentials) -> str:
+    service = build("calendar", "v3", credentials=creds)
 
     event = {
         'summary': summary,
         'start': {
-            'dateTime': start_time_iso,
-            'timeZone': 'Asia/Kolkata',  # Keep IST explicitly
+            'dateTime': start,
+            'timeZone': 'Asia/Kolkata',
         },
         'end': {
-            'dateTime': end_time_iso,
+            'dateTime': end,
             'timeZone': 'Asia/Kolkata',
         },
     }
 
     created_event = service.events().insert(calendarId='primary', body=event).execute()
-
-    print("📅 Event Created:", created_event)  # ✅ Useful for debugging
-    print("Event Link:", created_event.get("htmlLink"))
-
-    return created_event.get('htmlLink')  # ✅ This is what should be returned
-
+    print("📅 Event Created:", created_event)
+    return created_event.get("htmlLink")
