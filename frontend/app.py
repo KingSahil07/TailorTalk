@@ -31,14 +31,21 @@ st.set_page_config(
 # Load logo image
 logo_path = os.path.join("frontend", "assets", "logo.jpeg")
 if os.path.exists(logo_path):
-    cols = st.columns([1, 6])  # Logo and Title side by side
-    with cols[0]:
-        st.image(logo_path, width=60)
-    with cols[1]:
-        st.markdown("<h1 style='font-size: 40px; margin-bottom: 0;'>TailorTalk</h1>", unsafe_allow_html=True)
-        st.caption("Book meetings using natural language!")
+    col1, col2 = st.columns([1, 9])  # Logo : Title ratio
+
+    with col1:
+        st.image(logo_path, width=50)
+
+    with col2:
+        st.markdown("""
+            <div style='display: flex; align-items: center; height: 100%;'>
+                <h1 style='margin-bottom: 0; font-size: 36px;'>TailorTalk</h1>
+            </div>
+        """, unsafe_allow_html=True)
+    st.caption("Tailor your schedule with just a few words.")
 else:
     st.warning("Logo image not found.")
+
 
 # Session state for chat history
 if "messages" not in st.session_state:
